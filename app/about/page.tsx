@@ -58,7 +58,7 @@ export default function AboutPage() {
         <p className="mt-5 font-sans text-sm text-stone-500 max-w-md leading-relaxed">
           Monolith is a Stellar Rise In Level 5 protocol submission. It
           demonstrates that institutional-grade treasury infrastructure can be
-          built on Stellar's Soroban platform without sacrificing simplicity,
+          built on Stellar&apos;s Soroban platform without sacrificing simplicity,
           auditability, or user sovereignty.
         </p>
       </div>

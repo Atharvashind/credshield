@@ -41,7 +41,7 @@ export function ContactForm() {
       <div className="glass-panel rounded-xl p-8 flex flex-col items-start gap-4">
         <span className="w-2 h-2 rounded-full bg-green-400" />
         <p className="font-sans text-sm text-stone-300">
-          Message received. We'll be in touch shortly.
+          Message received. We&apos;ll be in touch shortly.
         </p>
       </div>
     );

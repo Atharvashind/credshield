@@ -37,7 +37,7 @@ export function VaultActivity() {
     }
   };
 
-  useEffect(() => { load(); }, [walletAddress]);
+  useEffect(() => { load(); }, [walletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = filter === "all" ? records : records.filter((r) => r.type === filter);
 

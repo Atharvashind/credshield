@@ -138,7 +138,7 @@ export default function PricingPage() {
         All fees are collected on-chain by the vault contract. The performance
         fee is deducted from yield accrued during each rebalance epoch, not from
         deposited principal. Stellar network transaction fees (~0.00001 XLM) are
-        paid by the user's wallet.
+        paid by the user&apos;s wallet.
       </p>
     </PageShell>
   );

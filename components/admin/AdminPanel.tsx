@@ -61,7 +61,7 @@ export function AdminPanel() {
             Trigger Rebalance
           </p>
           <p className="font-sans text-xs text-stone-600 leading-relaxed max-w-lg">
-            Applies a 0.5% yield increment to the vault's total liquidity.
+            Applies a 0.5% yield increment to the vault&apos;s total liquidity.
             NAV per share increases proportionally. All share holders benefit
             immediately — no action required on their part.
           </p>
