@@ -22,11 +22,11 @@ Monolith is a non-custodial treasury vault built on Stellar using Soroban smart 
 
 | # | Feedback | Fix | Commit |
 |---|----------|-----|--------|
-| 1 | Transaction history doesn't work | Fixed event fetching — use 10,000-ledger window to stay within RPC retention range; raw JSON-RPC decoder for protocol 22+ XDR | `fix/feedback` |
-| 2 | Pricing page doesn't make sense | Removed Pricing from navigation entirely | `fix/feedback` |
-| 3 | No wallet disconnect button | Added dropdown on connected wallet button with "Open Vault" and "Disconnect" options | `fix/feedback` |
-| 4 | Insufficient balance throws unreadable error | Added human-readable error messages mapped to each `VaultError` contract code (e.g. "Insufficient shares — you don't have enough MVLT") | `fix/feedback` |
-| 5 | "Login / Sign in" button is confusing | Renamed to "Connect Wallet" | `fix/feedback` |
+| 1 | Transaction history doesn't work | Fixed event fetching — use 10,000-ledger window to stay within RPC retention range; implemented raw JSON-RPC decoder for protocol 22+ XDR to bypass stellar-sdk parsing errors | [`9762c5d`](https://github.com/Atharvashind/treasury-vault/commit/9762c5d998539dec21efc139c861513d7169ad60) |
+| 2 | Pricing page doesn't make sense | Removed Pricing from navigation entirely — vault is free to use, no pricing tiers needed | [`9762c5d`](https://github.com/Atharvashind/treasury-vault/commit/9762c5d998539dec21efc139c861513d7169ad60) |
+| 3 | No wallet disconnect button | Added dropdown menu on connected wallet button with "Open Vault" and "Disconnect" options | [`9762c5d`](https://github.com/Atharvashind/treasury-vault/commit/9762c5d998539dec21efc139c861513d7169ad60) |
+| 4 | Insufficient balance throws unreadable error | Added human-readable error messages mapped to each `VaultError` contract code (e.g. "Insufficient shares — you don't have enough MVLT to withdraw that amount") | [`9762c5d`](https://github.com/Atharvashind/treasury-vault/commit/9762c5d998539dec21efc139c861513d7169ad60) |
+| 5 | "Login / Sign in" button is confusing | Renamed to "Connect Wallet" for clarity | [`9762c5d`](https://github.com/Atharvashind/treasury-vault/commit/9762c5d998539dec21efc139c861513d7169ad60) |
 
 ---
 
