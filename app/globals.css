@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------------------------------------------------
+   CSS custom properties — design tokens
+   -------------------------------------------------------------------------- */
+:root {
+  --color-beige: #d3cbbe;
+  --color-obsidian: #000000;
+  --color-accent: #c8bfb0;
+}
+
+/* --------------------------------------------------------------------------
+   Base resets
+   -------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbar styling — keep it minimal on the dark side
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(211, 203, 190, 0.2);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(211, 203, 190, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   Glassmorphism utility class
+   -------------------------------------------------------------------------- */
+@layer components {
+  .glass-panel {
+    @apply backdrop-blur-sm bg-white/5 border border-white/10 shadow-glass-dark;
+  }
+
+  .glass-panel-light {
+    @apply backdrop-blur-xs bg-black/5 border border-black/10 shadow-glass;
+  }
+
+  /* Navigation divider */
+  .nav-divider {
+    @apply w-px h-3 bg-stone-700;
+  }
+
+  /* Ghost button base */
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-sm font-sans
+           border border-stone-700 text-stone-300 rounded
+           transition-all duration-200
+           hover:border-beige hover:text-beige;
+  }
+
+  /* Solid beige CTA button */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 text-sm font-sans font-medium
+           bg-beige text-obsidian rounded
+           transition-all duration-200
+           hover:bg-beige-dark active:scale-95;
+  }
+}

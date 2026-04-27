@@ -1,0 +1,6 @@
+node_modules
+.next
+contracts/monolith-vault/target
+vaish
+.env.local
+*.log
