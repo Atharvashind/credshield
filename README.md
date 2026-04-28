@@ -1,5 +1,10 @@
 # Monolith — Institutional Treasury Vault
 
+![CI/CD](https://github.com/Atharvashind/treasury-vault/actions/workflows/ci.yml/badge.svg)
+![Stellar](https://img.shields.io/badge/Stellar-Testnet-blue)
+![Next.js](https://img.shields.io/badge/Next.js-14-black)
+![Soroban](https://img.shields.io/badge/Soroban-v22-purple)
+
 > Institutional-grade treasury management on the Stellar network.
 
 Monolith is a non-custodial treasury vault built on Stellar using Soroban smart contracts. Deposit XLM, earn algorithmic yield, and redeem at any time — all governed by immutable on-chain contracts.
