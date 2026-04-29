@@ -87,10 +87,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/monolith-vault/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
       - name: Install Stellar CLI
-        run: |
-          curl -sSL https://github.com/stellar/stellar-cli/releases/download/v25.1.0/stellar-cli-25.1.0-x86_64-unknown-linux-gnu.tar.gz \
-            | tar -xz -C /usr/local/bin stellar
-          stellar --version
+        uses: stellar/stellar-cli@v25.1.0
       - name: Build contract
         run: stellar contract build
         working-directory: contracts/monolith-vault
