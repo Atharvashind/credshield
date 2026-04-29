@@ -102,6 +102,7 @@ jobs:
 
   # -------------------------------------------------------------------------
   # Job 5: Deploy to Vercel (main branch only)
+  # Uses amondnet/vercel-action — no vercel pull needed, works with token only
   # -------------------------------------------------------------------------
   deploy:
     name: Deploy to Vercel
@@ -110,19 +111,10 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: amondnet/vercel-action@v25
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-      - run: npm install -g vercel@latest
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Build for Vercel
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          NEXT_PUBLIC_SOROBAN_RPC_URL: https://soroban-testnet.stellar.org
-          NEXT_PUBLIC_VAULT_CONTRACT_ID: ${{ secrets.VAULT_CONTRACT_ID }}
-          NEXT_PUBLIC_TOKEN_CONTRACT_ID: ${{ secrets.TOKEN_CONTRACT_ID }}
-          NEXT_PUBLIC_VAULT_ADMIN_ADDRESS: ${{ secrets.VAULT_ADMIN_ADDRESS }}
-      - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: "--prod"
+          working-directory: ./
