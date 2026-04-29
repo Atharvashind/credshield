@@ -98,9 +98,9 @@ jobs:
           retention-days: 7
 
   # -------------------------------------------------------------------------
-  # Job 5: Deploy to Vercel
-  # Uses the official vercel/action which creates a GitHub Deployment entry
-  # so it appears in the "Deployments" section on the repo homepage.
+  # Job 5: Deploy to Vercel + create GitHub Deployment
+  # The GitHub Deployment makes this appear in the "Deployments" sidebar
+  # on the repo homepage.
   # -------------------------------------------------------------------------
   deploy:
     name: Deploy to Vercel
@@ -115,11 +115,56 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to Vercel
-        uses: BetaHuhn/deploy-to-vercel-action@v1
+      - uses: actions/setup-node@v4
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      # Create a GitHub Deployment (shows in sidebar)
+      - name: Create GitHub Deployment
+        id: deployment
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: production
+          initial-status: in_progress
+
+      # Deploy to Vercel
+      - name: Deploy to Vercel
+        id: vercel
+        run: |
+          DEPLOY_URL=$(vercel deploy --prod \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --yes \
+            -e NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org \
+            -e NEXT_PUBLIC_VAULT_CONTRACT_ID=${{ secrets.VAULT_CONTRACT_ID }} \
+            -e NEXT_PUBLIC_TOKEN_CONTRACT_ID=${{ secrets.TOKEN_CONTRACT_ID }} \
+            -e NEXT_PUBLIC_VAULT_ADMIN_ADDRESS=${{ secrets.VAULT_ADMIN_ADDRESS }})
+          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+        env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          PRODUCTION: true
+
+      # Update GitHub Deployment status to success
+      - name: Update deployment status (success)
+        if: success()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: success
+          environment-url: ${{ steps.vercel.outputs.url }}
+
+      # Update GitHub Deployment status to failure
+      - name: Update deployment status (failure)
+        if: failure()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: failure
