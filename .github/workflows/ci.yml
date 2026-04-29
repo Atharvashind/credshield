@@ -98,31 +98,28 @@ jobs:
           retention-days: 7
 
   # -------------------------------------------------------------------------
-  # Job 5: Deploy to Vercel (main branch only)
+  # Job 5: Deploy to Vercel
+  # Uses the official vercel/action which creates a GitHub Deployment entry
+  # so it appears in the "Deployments" section on the repo homepage.
   # -------------------------------------------------------------------------
   deploy:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
     needs: [build, build-contract]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      deployments: write
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-      - run: npm ci --legacy-peer-deps
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
+
       - name: Deploy to Vercel
-        run: |
-          vercel deploy --prod \
-            --token=${{ secrets.VERCEL_TOKEN }} \
-            --yes \
-            -e NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org \
-            -e NEXT_PUBLIC_VAULT_CONTRACT_ID=${{ secrets.VAULT_CONTRACT_ID }} \
-            -e NEXT_PUBLIC_TOKEN_CONTRACT_ID=${{ secrets.TOKEN_CONTRACT_ID }} \
-            -e NEXT_PUBLIC_VAULT_ADMIN_ADDRESS=${{ secrets.VAULT_ADMIN_ADDRESS }}
-        env:
+        uses: BetaHuhn/deploy-to-vercel-action@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          PRODUCTION: true
