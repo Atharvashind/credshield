@@ -1,44 +1,33 @@
-# Dependencies
+# Next.js dependencies and build outputs
 node_modules/
-.pnp
-.pnp.js
-
-# Next.js build output
 .next/
 out/
 build/
 
-# Environment variables — never commit secrets
+# Rust/Cargo build output
+target/
+contracts/credshield/target/
+contracts/monolith-vault/target/
+*.wasm
+
+# Local environment files and credentials
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Rust / Soroban build artifacts
-contracts/monolith-vault/target/
-
-# macOS
-.DS_Store
-*.pem
-
-# Debug logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# Vercel
-.vercel
-
-# Editor
-.vscode/
+# IDE configurations
 .idea/
-*.swp
-*.swo
+.vscode/
+*.suo
+*.sw?
 
-# Sibling projects — not part of Monolith
-vaish/
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Agent temporary files
+agents.md
+.agents/
+skills-lock.json
