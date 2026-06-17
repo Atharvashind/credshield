@@ -153,7 +153,6 @@ mod test {
     use soroban_sdk::testutils::Address as _;
 
     #[test]
-    #[test]
     fn test_initialize_and_compliance() {
         let env = Env::default();
         env.mock_all_auths();
@@ -167,13 +166,15 @@ mod test {
 
         // Register a mock token contract
         let token_admin = Address::generate(&env);
-        let token_contract_id = env.register_stellar_asset_contract(token_admin.clone());
-        let token_client = token::Client::new(&env, &token_contract_id);
+        let token_sac = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_sac.address();
+        let token_client = token::Client::new(&env, &token_address);
+        let sac_client = token::StellarAssetClient::new(&env, &token_address);
 
-        client.initialize(&admin, &issuer, &token_contract_id);
+        client.initialize(&admin, &issuer, &token_address);
 
         // Mint tokens to user
-        token_client.mint(&user, &1000);
+        sac_client.mint(&user, &1000);
         assert_eq!(token_client.balance(&user), 1000);
 
         // Expiry in the future

@@ -1,4 +1,4 @@
-import { rpc, Horizon, Keypair, TransactionBuilder, Networks, Contract } from '@stellar/stellar-sdk';
+import { rpc, Horizon, Keypair, TransactionBuilder, Networks, Contract, nativeToScVal, scValToNative } from '@stellar/stellar-sdk';
 import { isConnected, getAddress, signTransaction, requestAccess, isAllowed } from '@stellar/freighter-api';
 
 // Initialize RPC and Horizon endpoints explicitly as required by SKILL.md
@@ -228,4 +228,33 @@ export async function executeContractTransaction(
     hash: response.hash,
     result: '',
   };
+}
+
+/**
+ * Queries the balance of a standard token for a given user address using simulation.
+ */
+export async function fetchTokenBalance(
+  tokenContractId: string,
+  userAddress: string
+): Promise<number> {
+  try {
+    const contract = new Contract(tokenContractId);
+    const txCall = contract.call('balance', nativeToScVal(userAddress, { type: 'address' }));
+    const account = await rpcServer.getAccount(userAddress);
+    const tx = new TransactionBuilder(account, {
+      fee: '100000',
+      networkPassphrase: Networks.TESTNET,
+    })
+      .addOperation(txCall)
+      .setTimeout(30)
+      .build();
+
+    const simRes = await rpcServer.simulateTransaction(tx);
+    if (rpc.Api.isSimulationSuccess(simRes) && simRes.result?.retval) {
+      return Number(scValToNative(simRes.result.retval));
+    }
+  } catch (e) {
+    console.warn('Could not fetch token balance:', e);
+  }
+  return 0;
 }

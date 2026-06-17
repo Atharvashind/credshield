@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { nativeToScVal, scValToNative, Contract, TransactionBuilder, Networks, rpc } from '@stellar/stellar-sdk';
-import { isFreighterConnected, getFreighterAddress, getFreighterAddressSilent, executeContractTransactionWithFreighter, rpcServer } from '../lib/stellar';
+import { isFreighterConnected, getFreighterAddress, getFreighterAddressSilent, executeContractTransactionWithFreighter, rpcServer, fetchTokenBalance } from '../lib/stellar';
 
 export default function CredShieldPage() {
   // Connection and Wallet State
@@ -25,9 +25,12 @@ export default function CredShieldPage() {
   
   // DeFi Vault state
   const [vaultBalance, setVaultBalance] = useState<number>(0);
+  const [tokenBalance, setTokenBalance] = useState<number>(0);
   const [amount, setAmount] = useState<string>('');
   const [vaultLog, setVaultLog] = useState<string>('System initialized on Stellar Testnet.\nPlease connect your Freighter wallet to proceed.');
   const [errorMessage, setErrorMessage] = useState<string>('');
+
+  const tokenId = process.env.NEXT_PUBLIC_SOROBAN_TOKEN_ID || 'CA3DVPHLVJ2O5ZZ7W3U2QDQVDJVHC7QZOEF5ZOXN23ZE5GUSHKLEAUEW';
 
   const contractId = process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || 'CCKXR3HQSMBQDHRQR7MP2QP4DS6SDGFNAHU47ONNJDJSTAP3BJPSKBU3';
 
@@ -54,13 +57,16 @@ export default function CredShieldPage() {
         if (addr) {
           setWalletAddress(addr);
           setWalletConnected(true);
-          setVaultLog((prev) => `${prev}\n[Wallet] Reconnected: ${addr}`);
+          setVaultLog((prev) => `${prev}\n[Wallet] Reconnected: ${addr}\n[Info] To mint mock USDC to your wallet, run:\nstellar contract invoke --id ${tokenId} --source-account deployer --network testnet -- mint --to ${addr} --amount 1000`);
           
           const compliant = await checkComplianceOnChain(addr);
           setIsVerified(compliant);
 
           const existingBalance = await fetchContractBalance(addr);
           setVaultBalance(existingBalance);
+
+          const tokenBal = await fetchTokenBalance(tokenId, addr);
+          setTokenBalance(tokenBal);
         }
       }
     } catch (e) {
@@ -80,13 +86,16 @@ export default function CredShieldPage() {
       const addr = await getFreighterAddress();
       setWalletAddress(addr);
       setWalletConnected(true);
-      setVaultLog((prev) => `${prev}\n[Wallet] Connected real Freighter wallet: ${addr}`);
+      setVaultLog((prev) => `${prev}\n[Wallet] Connected real Freighter wallet: ${addr}\n[Info] To mint mock USDC to your wallet, run:\nstellar contract invoke --id ${tokenId} --source-account deployer --network testnet -- mint --to ${addr} --amount 1000`);
       
       const compliant = await checkComplianceOnChain(addr);
       setIsVerified(compliant);
 
       const existingBalance = await fetchContractBalance(addr);
       setVaultBalance(existingBalance);
+
+      const tokenBal = await fetchTokenBalance(tokenId, addr);
+      setTokenBalance(tokenBal);
     } catch (err: any) {
       setErrorMessage(`Freighter Connection Error: ${err.message}`);
     }
@@ -97,6 +106,7 @@ export default function CredShieldPage() {
     setWalletAddress('');
     setIsVerified(false);
     setVaultBalance(0);
+    setTokenBalance(0);
     setErrorMessage('');
     setVaultLog((prev) => `${prev}\n[Wallet] Disconnected wallet.`);
   };
@@ -255,6 +265,10 @@ export default function CredShieldPage() {
 
       const updatedBalance = await fetchContractBalance(walletAddress);
       setVaultBalance(updatedBalance);
+
+      const updatedTokenBal = await fetchTokenBalance(tokenId, walletAddress);
+      setTokenBalance(updatedTokenBal);
+
       setVaultLog((prev) => `${prev}\n[DeFi Vault] Deposit executed successfully on testnet!\nTx URL: https://stellar.expert/explorer/testnet/tx/${result.hash}`);
       setAmount('');
     } catch (err: any) {
@@ -293,6 +307,10 @@ export default function CredShieldPage() {
 
       const updatedBalance = await fetchContractBalance(walletAddress);
       setVaultBalance(updatedBalance);
+
+      const updatedTokenBal = await fetchTokenBalance(tokenId, walletAddress);
+      setTokenBalance(updatedTokenBal);
+
       setVaultLog((prev) => `${prev}\n[DeFi Vault] Withdrawal executed successfully on testnet!\nTx URL: https://stellar.expert/explorer/testnet/tx/${result.hash}`);
       setAmount('');
     } catch (err: any) {
@@ -494,7 +512,11 @@ export default function CredShieldPage() {
                 <div className="font-display" style={{ fontSize: '48px', margin: '8px 0', letterSpacing: '-0.02em' }}>
                   {vaultBalance} <span style={{ fontSize: '24px', fontFamily: 'var(--font-body)', fontWeight: 400 }}>USDC</span>
                 </div>
-                <span className="type-caption" style={{ color: 'var(--color-text-secondary)' }}>Vault Gated by CredShield Smart Contract</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)' }}>
+                  <span className="type-overline">Wallet Balance:</span>
+                  <span className="type-code" style={{ fontWeight: 'bold' }}>{tokenBalance} USDC</span>
+                </div>
+                <span className="type-caption" style={{ color: 'var(--color-text-secondary)', display: 'block', marginTop: '8px' }}>Vault Gated by CredShield Smart Contract</span>
               </div>
 
               {errorMessage && (

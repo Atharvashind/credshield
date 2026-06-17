@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { nativeToScVal, scValToNative, Contract, TransactionBuilder, Networks, rpc } from '@stellar/stellar-sdk';
-import { isFreighterConnected, getFreighterAddress, getFreighterAddressSilent, executeContractTransactionWithFreighter, rpcServer } from '../../lib/stellar';
+import { isFreighterConnected, getFreighterAddress, getFreighterAddressSilent, executeContractTransactionWithFreighter, rpcServer, fetchTokenBalance } from '../../lib/stellar';
 
 export default function VaultPage() {
   // Connection and Wallet State
@@ -14,6 +14,7 @@ export default function VaultPage() {
 
   // Vault state
   const [vaultBalance, setVaultBalance] = useState<number>(0);
+  const [tokenBalance, setTokenBalance] = useState<number>(0);
   const [amount, setAmount] = useState<string>('');
   const [vaultLog, setVaultLog] = useState<string>('System initialized on Stellar Testnet.\nPlease connect your Freighter wallet to manage custody.');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -24,6 +25,7 @@ export default function VaultPage() {
   const [projectedYield, setProjectedYield] = useState<number>(55); // 5.5% APY
 
   const contractId = process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || 'CCKXR3HQSMBQDHRQR7MP2QP4DS6SDGFNAHU47ONNJDJSTAP3BJPSKBU3';
+  const tokenId = process.env.NEXT_PUBLIC_SOROBAN_TOKEN_ID || 'CA3DVPHLVJ2O5ZZ7W3U2QDQVDJVHC7QZOEF5ZOXN23ZE5GUSHKLEAUEW';
 
   useEffect(() => {
     checkWalletConnection();
@@ -41,7 +43,7 @@ export default function VaultPage() {
         if (addr) {
           setWalletAddress(addr);
           setWalletConnected(true);
-          setVaultLog((prev) => `${prev}\n[Wallet] Reconnected: ${addr}`);
+          setVaultLog((prev) => `${prev}\n[Wallet] Reconnected: ${addr}\n[Info] To mint mock USDC to your wallet, run:\nstellar contract invoke --id ${tokenId} --source-account deployer --network testnet -- mint --to ${addr} --amount 1000`);
           
           // Check compliance on-chain
           const compliant = await checkComplianceOnChain(addr);
@@ -51,6 +53,9 @@ export default function VaultPage() {
           // Pull balance
           const balance = await fetchContractBalance(addr);
           setVaultBalance(balance);
+
+          const tokenBal = await fetchTokenBalance(tokenId, addr);
+          setTokenBalance(tokenBal);
         }
       }
     } catch (e) {
@@ -69,13 +74,16 @@ export default function VaultPage() {
       const addr = await getFreighterAddress();
       setWalletAddress(addr);
       setWalletConnected(true);
-      setVaultLog((prev) => `${prev}\n[Wallet] Connected real wallet: ${addr}`);
+      setVaultLog((prev) => `${prev}\n[Wallet] Connected real wallet: ${addr}\n[Info] To mint mock USDC to your wallet, run:\nstellar contract invoke --id ${tokenId} --source-account deployer --network testnet -- mint --to ${addr} --amount 1000`);
       
       const compliant = await checkComplianceOnChain(addr);
       setIsVerified(compliant);
       
       const balance = await fetchContractBalance(addr);
       setVaultBalance(balance);
+
+      const tokenBal = await fetchTokenBalance(tokenId, addr);
+      setTokenBalance(tokenBal);
     } catch (err: any) {
       setErrorMessage(`Freighter connection failed: ${err.message}`);
     }
@@ -86,6 +94,7 @@ export default function VaultPage() {
     setWalletAddress('');
     setIsVerified(false);
     setVaultBalance(0);
+    setTokenBalance(0);
     setErrorMessage('');
     setVaultLog((prev) => `${prev}\n[Wallet] Disconnected wallet.`);
   };
@@ -178,8 +187,13 @@ export default function VaultPage() {
         nativeToScVal(BigInt(val), { type: 'i128' }),
       ];
       const result = await executeContractTransactionWithFreighter(contractId, 'deposit', scArgs, walletAddress);
+      
       const updatedBalance = await fetchContractBalance(walletAddress);
       setVaultBalance(updatedBalance);
+      
+      const updatedTokenBal = await fetchTokenBalance(tokenId, walletAddress);
+      setTokenBalance(updatedTokenBal);
+
       setVaultLog((prev) => `${prev}\n[Vault] Deposit complete!\nTx Hash: ${result.hash}`);
       setAmount('');
     } catch (err: any) {
@@ -207,8 +221,13 @@ export default function VaultPage() {
         nativeToScVal(BigInt(val), { type: 'i128' }),
       ];
       const result = await executeContractTransactionWithFreighter(contractId, 'withdraw', scArgs, walletAddress);
+      
       const updatedBalance = await fetchContractBalance(walletAddress);
       setVaultBalance(updatedBalance);
+
+      const updatedTokenBal = await fetchTokenBalance(tokenId, walletAddress);
+      setTokenBalance(updatedTokenBal);
+
       setVaultLog((prev) => `${prev}\n[Vault] Withdrawal complete!\nTx Hash: ${result.hash}`);
       setAmount('');
     } catch (err: any) {
@@ -298,7 +317,11 @@ export default function VaultPage() {
               <div className="font-display" style={{ fontSize: '48px', margin: '8px 0', letterSpacing: '-0.02em' }}>
                 {vaultBalance} <span style={{ fontSize: '24px', fontFamily: 'var(--font-body)', fontWeight: 400 }}>USDC</span>
               </div>
-              <span className="type-caption" style={{ color: 'var(--color-text-secondary)' }}>Verifiable under Soroban Contract {contractId.substring(0, 8)}...</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)' }}>
+                <span className="type-overline">Wallet Balance:</span>
+                <span className="type-code" style={{ fontWeight: 'bold' }}>{tokenBalance} USDC</span>
+              </div>
+              <span className="type-caption" style={{ color: 'var(--color-text-secondary)', display: 'block', marginTop: '8px' }}>Verifiable under Soroban Contract {contractId.substring(0, 8)}...</span>
             </div>
 
             {errorMessage && (
