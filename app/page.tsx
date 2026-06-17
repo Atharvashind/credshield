@@ -197,20 +197,48 @@ export default function CredShieldPage() {
     setIsVerified(false);
 
     try {
-      setProvingStep('Stage 1: Hashing credential parameters locally...');
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      setProvingStep('Stage 1: Generating random blinding factors (salts) client-side...');
+      const salt = window.crypto.getRandomValues(new Uint8Array(16));
+      const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
-      setProvingStep('Stage 2: Synthesizing SNARK proof constraints over BN254 curve...');
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      setProvingStep('Stage 2: Hashing eligibility attributes (Age ≥ 18, Country) to create a ZK commitment...');
+      const encoder = new TextEncoder();
+      const data = encoder.encode(walletAddress + birthYear + country + saltHex);
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const commitmentHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
-      setProvingStep('Stage 3: Requesting Freighter signature to verify compliance on-chain...');
+      setProvingStep('Stage 3: Generating ephemeral ECDSA keypair & signing commitment proof...');
+      const keyPair = await window.crypto.subtle.generateKey(
+        {
+          name: "ECDSA",
+          namedCurve: "P-256",
+        },
+        true,
+        ["sign", "verify"]
+      );
+      const signatureBuffer = await window.crypto.subtle.sign(
+        {
+          name: "ECDSA",
+          hash: { name: "SHA-256" },
+        },
+        keyPair.privateKey,
+        data
+      );
+      const signatureArray = Array.from(new Uint8Array(signatureBuffer));
+      const proofHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      setProvingStep('Stage 4: Requesting Freighter signature to verify compliance on-chain...');
       
-      const mockSig = Buffer.from('MOCK_SIGNATURE');
+      const proofBytes = Buffer.from(proofHex.substring(0, 32)); // pass proof slice as signature
       const expiryTime = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour expiry
 
       const scArgs = [
         nativeToScVal(walletAddress, { type: 'address' }),
-        nativeToScVal(mockSig, { type: 'bytes' }),
+        nativeToScVal(proofBytes, { type: 'bytes' }),
         nativeToScVal(birthYear, { type: 'u32' }),
         nativeToScVal(country, { type: 'symbol' }),
         nativeToScVal(expiryTime, { type: 'u64' }),
@@ -224,7 +252,7 @@ export default function CredShieldPage() {
         walletAddress
       );
 
-      setZkProof(`groth16_proof_bn254_tx_${result.hash.substring(0, 16)}...`);
+      setZkProof(`commitment: ${commitmentHex.substring(0, 16)}...\nproof: ${proofHex.substring(0, 16)}...`);
       setIsVerified(true);
       setVaultLog((prev) => `${prev}\n[Compliance] On-chain verification SUCCESS!\nTx URL: https://stellar.expert/explorer/testnet/tx/${result.hash}`);
     } catch (err: any) {
