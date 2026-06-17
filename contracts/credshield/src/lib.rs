@@ -1,11 +1,12 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, log, symbol_short, Address, Bytes, Env, Symbol};
+use soroban_sdk::{token, contract, contractimpl, contracttype, log, symbol_short, Address, Bytes, Env, Symbol};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Admin,
     Issuer,
+    Token,
     Compliant(Address),
     VaultBalance(Address),
 }
@@ -16,12 +17,13 @@ pub struct CredShieldContract;
 #[contractimpl]
 impl CredShieldContract {
     /// Initialize the contract with the admin and the public key of the identity anchor.
-    pub fn initialize(env: Env, admin: Address, issuer: Address) {
+    pub fn initialize(env: Env, admin: Address, issuer: Address, token: Address) {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("Contract is already initialized");
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Issuer, &issuer);
+        env.storage().instance().set(&DataKey::Token, &token);
     }
 
     /// Verifies the KYC credentials using a digital signature from the trusted issuer.
@@ -90,6 +92,13 @@ impl CredShieldContract {
             panic!("Access denied: Wallet compliance check failed. Verify credentials in CredShield first.");
         }
 
+        // Retrieve token address from storage
+        let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
+        let token_client = token::Client::new(&env, &token_addr);
+
+        // Transfer tokens from user to contract
+        token_client.transfer(&user, &env.current_contract_address(), &amount);
+
         let key = DataKey::VaultBalance(user.clone());
         let current_balance: i128 = env.storage().instance().get(&key).unwrap_or(0);
         let new_balance = current_balance + amount;
@@ -117,6 +126,13 @@ impl CredShieldContract {
             panic!("Insufficient balance in gated vault");
         }
 
+        // Retrieve token address from storage
+        let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
+        let token_client = token::Client::new(&env, &token_addr);
+
+        // Transfer tokens from contract to user
+        token_client.transfer(&env.current_contract_address(), &user, &amount);
+
         let new_balance = current_balance - amount;
         env.storage().instance().set(&key, &new_balance);
 
@@ -137,6 +153,7 @@ mod test {
     use soroban_sdk::testutils::Address as _;
 
     #[test]
+    #[test]
     fn test_initialize_and_compliance() {
         let env = Env::default();
         env.mock_all_auths();
@@ -148,7 +165,16 @@ mod test {
         let issuer = Address::generate(&env);
         let user = Address::generate(&env);
 
-        client.initialize(&admin, &issuer);
+        // Register a mock token contract
+        let token_admin = Address::generate(&env);
+        let token_contract_id = env.register_stellar_asset_contract(token_admin.clone());
+        let token_client = token::Client::new(&env, &token_contract_id);
+
+        client.initialize(&admin, &issuer, &token_contract_id);
+
+        // Mint tokens to user
+        token_client.mint(&user, &1000);
+        assert_eq!(token_client.balance(&user), 1000);
 
         // Expiry in the future
         let expiry = env.ledger().timestamp() + 3600;
@@ -161,10 +187,14 @@ mod test {
         // Check gated deposit
         client.deposit(&user, &100);
         assert_eq!(client.get_balance(&user), 100);
+        assert_eq!(token_client.balance(&user), 900);
+        assert_eq!(token_client.balance(&contract_id), 100);
 
         // Check gated withdraw
         client.withdraw(&user, &40);
         assert_eq!(client.get_balance(&user), 60);
+        assert_eq!(token_client.balance(&user), 940);
+        assert_eq!(token_client.balance(&contract_id), 60);
     }
 
     #[test]
@@ -179,8 +209,9 @@ mod test {
         let admin = Address::generate(&env);
         let issuer = Address::generate(&env);
         let user = Address::generate(&env);
+        let token = Address::generate(&env);
 
-        client.initialize(&admin, &issuer);
+        client.initialize(&admin, &issuer, &token);
 
         let expiry = env.ledger().timestamp() + 3600;
         let mock_sig = Bytes::from_slice(&env, b"MOCK_SIGNATURE");
@@ -201,8 +232,9 @@ mod test {
         let admin = Address::generate(&env);
         let issuer = Address::generate(&env);
         let user = Address::generate(&env);
+        let token = Address::generate(&env);
 
-        client.initialize(&admin, &issuer);
+        client.initialize(&admin, &issuer, &token);
 
         let expiry = env.ledger().timestamp() + 3600;
         let mock_sig = Bytes::from_slice(&env, b"MOCK_SIGNATURE");
@@ -223,8 +255,9 @@ mod test {
         let admin = Address::generate(&env);
         let issuer = Address::generate(&env);
         let user = Address::generate(&env);
+        let token = Address::generate(&env);
 
-        client.initialize(&admin, &issuer);
+        client.initialize(&admin, &issuer, &token);
 
         // Try to deposit without verifying compliance first -> rejected
         client.deposit(&user, &50);
