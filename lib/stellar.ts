@@ -67,6 +67,44 @@ export async function getFreighterAddress(): Promise<string> {
 }
 
 /**
+ * Custom fetch-based poller to bypass the JS SDK's XDR deserialization bug ("Bad union switch: 4")
+ * on newer Soroban network protocol versions.
+ */
+async function pollTransactionStatus(hash: string): Promise<string> {
+  const payload = {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'getTransaction',
+    params: { hash }
+  };
+
+  let attempts = 0;
+  while (attempts < 15) {
+    try {
+      const res = await fetch(SOROBAN_RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.result && json.result.status) {
+          const status = json.result.status;
+          if (status === 'SUCCESS' || status === 'FAILED') {
+            return status;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error polling transaction status:', e);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    attempts++;
+  }
+  return 'NOT_FOUND';
+}
+
+/**
  * Standard utility function representing a linear transaction execution pipeline
  * signing and submitting using the Freighter extension.
  */
@@ -120,24 +158,18 @@ export async function executeContractTransactionWithFreighter(
     throw new Error(`Transaction submission failed: ${JSON.stringify(response.errorResult)}`);
   }
 
-  // 7. Poll for transaction completion status
+  // 7. Poll for transaction completion status using custom fetch bypass
   console.log('[Freighter Pipeline] Polling transaction status...');
-  let txResult = await rpcServer.getTransaction(response.hash);
-  let attempts = 0;
-  while (txResult.status === 'NOT_FOUND' && attempts < 15) {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    txResult = await rpcServer.getTransaction(response.hash);
-    attempts++;
-  }
+  const txStatus = await pollTransactionStatus(response.hash);
 
-  if (txResult.status !== 'SUCCESS') {
-    throw new Error(`Transaction execution failed: ${txResult.status}`);
+  if (txStatus !== 'SUCCESS') {
+    throw new Error(`Transaction execution failed with status: ${txStatus}`);
   }
 
   console.log('[Freighter Pipeline] Transaction executed successfully!');
   return {
     hash: response.hash,
-    result: txResult.resultMetaXdr,
+    result: '', // bypassed parsing result XDR
   };
 }
 
@@ -184,21 +216,16 @@ export async function executeContractTransaction(
     throw new Error(`Transaction submission failed: ${JSON.stringify(response.errorResult)}`);
   }
 
-  // 7. Poll for completion status
-  let txResult = await rpcServer.getTransaction(response.hash);
-  let attempts = 0;
-  while (txResult.status === 'NOT_FOUND' && attempts < 15) {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    txResult = await rpcServer.getTransaction(response.hash);
-    attempts++;
-  }
+  // 7. Poll for completion status using custom fetch bypass
+  console.log('[Private Key Pipeline] Polling transaction status...');
+  const txStatus = await pollTransactionStatus(response.hash);
 
-  if (txResult.status !== 'SUCCESS') {
-    throw new Error(`Transaction execution failed with status: ${txResult.status}`);
+  if (txStatus !== 'SUCCESS') {
+    throw new Error(`Transaction execution failed with status: ${txStatus}`);
   }
 
   return {
     hash: response.hash,
-    result: txResult.resultMetaXdr,
+    result: '',
   };
 }
