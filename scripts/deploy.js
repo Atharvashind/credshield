@@ -9,7 +9,7 @@ async function deployWorkflow() {
   try {
     // 1. Build the Rust smart contract
     console.log('🛠️ Step 1: Compiling Rust contract using cargo build...');
-    execSync('cargo build --target wasm32-unknown-unknown --release', {
+    execSync('cargo build --target wasm32v1-none --release', {
       cwd: path.join(__dirname, '../contracts/credshield'),
       stdio: 'inherit',
     });
