@@ -1,4 +1,4 @@
-import { rpc, Horizon, Keypair, TransactionBuilder, Networks, Contract, nativeToScVal, scValToNative } from '@stellar/stellar-sdk';
+import { rpc, Horizon, Keypair, TransactionBuilder, Networks, Contract, nativeToScVal, scValToNative, Asset, Operation } from '@stellar/stellar-sdk';
 import { isConnected, getAddress, signTransaction, requestAccess, isAllowed } from '@stellar/freighter-api';
 
 // Initialize RPC and Horizon endpoints explicitly as required by SKILL.md
@@ -257,4 +257,65 @@ export async function fetchTokenBalance(
     console.warn('Could not fetch token balance:', e);
   }
   return 0;
+}
+
+/**
+ * Checks if the user's account has a trustline for the USDC asset.
+ */
+export async function checkTrustline(userPublicKey: string): Promise<boolean> {
+  try {
+    const account = await horizonServer.loadAccount(userPublicKey);
+    const hasTrustline = account.balances.some((balance: any) => {
+      return (
+        balance.asset_code === 'USDC' &&
+        balance.asset_issuer === 'GC5HL2KXTCEXGZU4N6QIDQLIXW6HSFYEZV7ELAEEHDL4EHUMVSTZCPX6'
+      );
+    });
+    return hasTrustline;
+  } catch (e: any) {
+    // If account doesn't exist (404), it has no trustline
+    console.warn('Error checking trustline:', e);
+    return false;
+  }
+}
+
+/**
+ * Establishes a trustline for the USDC asset using Freighter.
+ */
+export async function addTrustlineWithFreighter(userPublicKey: string) {
+  console.log(`[Freighter Pipeline] Establishing USDC trustline for ${userPublicKey}...`);
+  
+  // Load account
+  const account = await horizonServer.loadAccount(userPublicKey);
+  
+  // Build trustline operation
+  const asset = new Asset('USDC', 'GC5HL2KXTCEXGZU4N6QIDQLIXW6HSFYEZV7ELAEEHDL4EHUMVSTZCPX6');
+  const op = Operation.changeTrust({ asset });
+
+  const tx = new TransactionBuilder(account, {
+    fee: '100000',
+    networkPassphrase: Networks.TESTNET,
+  })
+    .addOperation(op)
+    .setTimeout(30)
+    .build();
+
+  console.log('[Freighter Pipeline] Requesting wallet signature via Freighter API for trustline...');
+  const xdr = tx.toXDR();
+  const res = await signTransaction(xdr, {
+    networkPassphrase: Networks.TESTNET,
+  });
+
+  if (res.error) {
+    throw new Error(`Signing trustline transaction failed: ${res.error.message}`);
+  }
+
+  const signedTx = TransactionBuilder.fromXDR(res.signedTxXdr, Networks.TESTNET);
+
+  console.log('[Freighter Pipeline] Submitting signed trustline transaction to Horizon...');
+  const submitResult = await horizonServer.submitTransaction(signedTx);
+  
+  return {
+    hash: submitResult.hash,
+  };
 }

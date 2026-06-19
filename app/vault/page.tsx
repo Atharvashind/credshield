@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { nativeToScVal, scValToNative, Contract, TransactionBuilder, Networks, rpc } from '@stellar/stellar-sdk';
-import { isFreighterConnected, getFreighterAddress, getFreighterAddressSilent, executeContractTransactionWithFreighter, rpcServer, fetchTokenBalance } from '../../lib/stellar';
+import { isFreighterConnected, getFreighterAddress, getFreighterAddressSilent, executeContractTransactionWithFreighter, rpcServer, fetchTokenBalance, checkTrustline, addTrustlineWithFreighter } from '../../lib/stellar';
+import { mintMockUSDC } from '../actions';
 
 export default function VaultPage() {
   // Connection and Wallet State
@@ -18,6 +19,9 @@ export default function VaultPage() {
   const [amount, setAmount] = useState<string>('');
   const [vaultLog, setVaultLog] = useState<string>('System initialized on Stellar Testnet.\nPlease connect your Freighter wallet to manage custody.');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [hasTrustline, setHasTrustline] = useState<boolean>(true);
+  const [isEstablishingTrustline, setIsEstablishingTrustline] = useState<boolean>(false);
+  const [isMinting, setIsMinting] = useState<boolean>(false);
   
   // Yield Calculator state
   const [calcAmount, setCalcAmount] = useState<string>('1000');
@@ -56,6 +60,12 @@ export default function VaultPage() {
 
           const tokenBal = await fetchTokenBalance(tokenId, addr);
           setTokenBalance(tokenBal);
+
+          const trust = await checkTrustline(addr);
+          setHasTrustline(trust);
+          if (!trust) {
+            setVaultLog((prev) => `${prev}\n[Warning] USDC trustline is missing for account ${addr}. Please add it to perform deposits/withdrawals.`);
+          }
         }
       }
     } catch (e) {
@@ -84,6 +94,12 @@ export default function VaultPage() {
 
       const tokenBal = await fetchTokenBalance(tokenId, addr);
       setTokenBalance(tokenBal);
+
+      const trust = await checkTrustline(addr);
+      setHasTrustline(trust);
+      if (!trust) {
+        setVaultLog((prev) => `${prev}\n[Warning] USDC trustline is missing for account ${addr}. Please add it to perform deposits/withdrawals.`);
+      }
     } catch (err: any) {
       setErrorMessage(`Freighter connection failed: ${err.message}`);
     }
@@ -95,8 +111,51 @@ export default function VaultPage() {
     setIsVerified(false);
     setVaultBalance(0);
     setTokenBalance(0);
+    setHasTrustline(true);
     setErrorMessage('');
     setVaultLog((prev) => `${prev}\n[Wallet] Disconnected wallet.`);
+  };
+
+  const handleCreateTrustline = async () => {
+    if (!walletAddress) return;
+    setIsEstablishingTrustline(true);
+    setErrorMessage('');
+    setVaultLog((prev) => `${prev}\n[Trustline] Requesting signature to establish USDC trustline...`);
+    try {
+      const result = await addTrustlineWithFreighter(walletAddress);
+      setHasTrustline(true);
+      setVaultLog((prev) => `${prev}\n[Trustline] USDC trustline established successfully!\nTx Hash: ${result.hash}`);
+      
+      const tokenBal = await fetchTokenBalance(tokenId, walletAddress);
+      setTokenBalance(tokenBal);
+    } catch (err: any) {
+      setErrorMessage(`Failed to establish trustline: ${err.message}`);
+      setVaultLog((prev) => `${prev}\n[Error] Trustline setup failed: ${err.message}`);
+    } finally {
+      setIsEstablishingTrustline(false);
+    }
+  };
+
+  const handleMintMockUSDC = async () => {
+    if (!walletAddress) {
+      setErrorMessage('Connect wallet first.');
+      return;
+    }
+    setIsMinting(true);
+    setErrorMessage('');
+    setVaultLog((prev) => `${prev}\n[Server Action] Requesting 1,000 mock USDC to be minted to ${walletAddress}...`);
+    try {
+      const result = await mintMockUSDC(walletAddress, 1000);
+      setVaultLog((prev) => `${prev}\n[Server Action] Success! 1,000 mock USDC minted.\nTx Hash: ${result.hash}`);
+      
+      const tokenBal = await fetchTokenBalance(tokenId, walletAddress);
+      setTokenBalance(tokenBal);
+    } catch (err: any) {
+      setErrorMessage(`Minting mock USDC failed: ${err.message}`);
+      setVaultLog((prev) => `${prev}\n[Error] Minting failed: ${err.message}`);
+    } finally {
+      setIsMinting(false);
+    }
   };
 
   // Fund Freighter address with Testnet Friendbot
@@ -317,12 +376,51 @@ export default function VaultPage() {
               <div className="font-display" style={{ fontSize: '48px', margin: '8px 0', letterSpacing: '-0.02em' }}>
                 {vaultBalance} <span style={{ fontSize: '24px', fontFamily: 'var(--font-body)', fontWeight: 400 }}>USDC</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)' }}>
-                <span className="type-overline">Wallet Balance:</span>
-                <span className="type-code" style={{ fontWeight: 'bold' }}>{tokenBalance} USDC</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)', alignItems: 'center' }}>
+                <div>
+                  <span className="type-overline">Wallet Balance:</span>
+                  <span className="type-code" style={{ fontWeight: 'bold', marginLeft: '8px' }}>{tokenBalance} USDC</span>
+                </div>
+                {walletConnected && (
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={handleMintMockUSDC}
+                    disabled={isMinting}
+                    style={{ fontSize: '11px', padding: '4px 8px' }}
+                  >
+                    {isMinting ? 'Minting...' : 'Mint 1K USDC'}
+                  </button>
+                )}
               </div>
               <span className="type-caption" style={{ color: 'var(--color-text-secondary)', display: 'block', marginTop: '8px' }}>Verifiable under Soroban Contract {contractId.substring(0, 8)}...</span>
             </div>
+
+            {walletConnected && !hasTrustline && (
+              <div style={{
+                padding: '16px',
+                backgroundColor: 'var(--color-error-bg)',
+                border: '2px solid var(--color-error)',
+                marginBottom: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ fontWeight: 'bold', color: 'var(--color-error)', fontSize: '14px' }}>
+                  ⚠️ USDC Trustline Missing
+                </div>
+                <p className="type-caption" style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
+                  Your wallet lacks a trustline for the USDC asset. You must add the trustline to deposit or withdraw tokens.
+                </p>
+                <button
+                  className="btn btn-sm btn-destructive"
+                  onClick={handleCreateTrustline}
+                  disabled={isEstablishingTrustline}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  {isEstablishingTrustline ? 'Establishing Trustline...' : 'Add USDC Trustline'}
+                </button>
+              </div>
+            )}
 
             {errorMessage && (
               <div style={{ padding: '12px', backgroundColor: 'var(--color-error-bg)', color: 'var(--color-error)', border: '2px solid var(--color-error)', marginBottom: '20px', fontWeight: 'bold', fontSize: '14px' }}>
@@ -343,8 +441,8 @@ export default function VaultPage() {
             </div>
 
             <div className="flex-row-gap" style={{ marginBottom: '32px' }}>
-              <button id="deposit-btn" className="btn btn-md btn-primary" style={{ flex: '1' }} onClick={handleDeposit}>Deposit</button>
-              <button id="withdraw-btn" className="btn btn-md btn-secondary" style={{ flex: '1' }} onClick={handleWithdraw}>Withdraw</button>
+              <button id="deposit-btn" className="btn btn-md btn-primary" style={{ flex: '1' }} onClick={handleDeposit} disabled={!hasTrustline}>Deposit</button>
+              <button id="withdraw-btn" className="btn btn-md btn-secondary" style={{ flex: '1' }} onClick={handleWithdraw} disabled={!hasTrustline}>Withdraw</button>
             </div>
 
             {/* Event Logs console */}

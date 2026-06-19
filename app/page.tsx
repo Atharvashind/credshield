@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { nativeToScVal, scValToNative, Contract, TransactionBuilder, Networks, rpc } from '@stellar/stellar-sdk';
-import { isFreighterConnected, getFreighterAddress, getFreighterAddressSilent, executeContractTransactionWithFreighter, rpcServer, fetchTokenBalance } from '../lib/stellar';
+import { isFreighterConnected, getFreighterAddress, getFreighterAddressSilent, executeContractTransactionWithFreighter, rpcServer, fetchTokenBalance, checkTrustline, addTrustlineWithFreighter } from '../lib/stellar';
+import { mintMockUSDC } from './actions';
 
 export default function CredShieldPage() {
   // Connection and Wallet State
@@ -29,6 +30,9 @@ export default function CredShieldPage() {
   const [amount, setAmount] = useState<string>('');
   const [vaultLog, setVaultLog] = useState<string>('System initialized on Stellar Testnet.\nPlease connect your Freighter wallet to proceed.');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [hasTrustline, setHasTrustline] = useState<boolean>(true);
+  const [isEstablishingTrustline, setIsEstablishingTrustline] = useState<boolean>(false);
+  const [isMinting, setIsMinting] = useState<boolean>(false);
 
   const tokenId = process.env.NEXT_PUBLIC_SOROBAN_TOKEN_ID || 'CA3DVPHLVJ2O5ZZ7W3U2QDQVDJVHC7QZOEF5ZOXN23ZE5GUSHKLEAUEW';
 
@@ -67,6 +71,12 @@ export default function CredShieldPage() {
 
           const tokenBal = await fetchTokenBalance(tokenId, addr);
           setTokenBalance(tokenBal);
+
+          const trust = await checkTrustline(addr);
+          setHasTrustline(trust);
+          if (!trust) {
+            setVaultLog((prev) => `${prev}\n[Warning] USDC trustline is missing for account ${addr}. Please add it to perform deposits/withdrawals.`);
+          }
         }
       }
     } catch (e) {
@@ -96,6 +106,12 @@ export default function CredShieldPage() {
 
       const tokenBal = await fetchTokenBalance(tokenId, addr);
       setTokenBalance(tokenBal);
+
+      const trust = await checkTrustline(addr);
+      setHasTrustline(trust);
+      if (!trust) {
+        setVaultLog((prev) => `${prev}\n[Warning] USDC trustline is missing for account ${addr}. Please add it to perform deposits/withdrawals.`);
+      }
     } catch (err: any) {
       setErrorMessage(`Freighter Connection Error: ${err.message}`);
     }
@@ -107,8 +123,51 @@ export default function CredShieldPage() {
     setIsVerified(false);
     setVaultBalance(0);
     setTokenBalance(0);
+    setHasTrustline(true);
     setErrorMessage('');
     setVaultLog((prev) => `${prev}\n[Wallet] Disconnected wallet.`);
+  };
+
+  const handleCreateTrustline = async () => {
+    if (!walletAddress) return;
+    setIsEstablishingTrustline(true);
+    setErrorMessage('');
+    setVaultLog((prev) => `${prev}\n[Trustline] Requesting signature to establish USDC trustline...`);
+    try {
+      const result = await addTrustlineWithFreighter(walletAddress);
+      setHasTrustline(true);
+      setVaultLog((prev) => `${prev}\n[Trustline] USDC trustline established successfully!\nTx Hash: ${result.hash}`);
+      
+      const tokenBal = await fetchTokenBalance(tokenId, walletAddress);
+      setTokenBalance(tokenBal);
+    } catch (err: any) {
+      setErrorMessage(`Failed to establish trustline: ${err.message}`);
+      setVaultLog((prev) => `${prev}\n[Error] Trustline setup failed: ${err.message}`);
+    } finally {
+      setIsEstablishingTrustline(false);
+    }
+  };
+
+  const handleMintMockUSDC = async () => {
+    if (!walletAddress) {
+      setErrorMessage('Connect wallet first.');
+      return;
+    }
+    setIsMinting(true);
+    setErrorMessage('');
+    setVaultLog((prev) => `${prev}\n[Server Action] Requesting 1,000 mock USDC to be minted to ${walletAddress}...`);
+    try {
+      const result = await mintMockUSDC(walletAddress, 1000);
+      setVaultLog((prev) => `${prev}\n[Server Action] Success! 1,000 mock USDC minted.\nTx Hash: ${result.hash}`);
+      
+      const tokenBal = await fetchTokenBalance(tokenId, walletAddress);
+      setTokenBalance(tokenBal);
+    } catch (err: any) {
+      setErrorMessage(`Minting mock USDC failed: ${err.message}`);
+      setVaultLog((prev) => `${prev}\n[Error] Minting failed: ${err.message}`);
+    } finally {
+      setIsMinting(false);
+    }
   };
 
   // Fund Freighter address with Testnet Friendbot
@@ -233,7 +292,9 @@ export default function CredShieldPage() {
 
       setProvingStep('Stage 4: Requesting Freighter signature to verify compliance on-chain...');
       
-      const proofBytes = Buffer.from(proofHex.substring(0, 32)); // pass proof slice as signature
+      const rawProofBytes = new Uint8Array(proofHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+      const proofBytes = new Uint8Array(256);
+      proofBytes.set(rawProofBytes.subarray(0, 256));
       const expiryTime = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour expiry
 
       const scArgs = [
@@ -540,12 +601,51 @@ export default function CredShieldPage() {
                 <div className="font-display" style={{ fontSize: '48px', margin: '8px 0', letterSpacing: '-0.02em' }}>
                   {vaultBalance} <span style={{ fontSize: '24px', fontFamily: 'var(--font-body)', fontWeight: 400 }}>USDC</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)' }}>
-                  <span className="type-overline">Wallet Balance:</span>
-                  <span className="type-code" style={{ fontWeight: 'bold' }}>{tokenBalance} USDC</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)', alignItems: 'center' }}>
+                  <div>
+                    <span className="type-overline">Wallet Balance:</span>
+                    <span className="type-code" style={{ fontWeight: 'bold', marginLeft: '8px' }}>{tokenBalance} USDC</span>
+                  </div>
+                  {walletConnected && (
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={handleMintMockUSDC}
+                      disabled={isMinting}
+                      style={{ fontSize: '11px', padding: '4px 8px' }}
+                    >
+                      {isMinting ? 'Minting...' : 'Mint 1K USDC'}
+                    </button>
+                  )}
                 </div>
                 <span className="type-caption" style={{ color: 'var(--color-text-secondary)', display: 'block', marginTop: '8px' }}>Vault Gated by CredShield Smart Contract</span>
               </div>
+
+              {walletConnected && !hasTrustline && (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: 'var(--color-error-bg)',
+                  border: '2px solid var(--color-error)',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: 'var(--color-error)', fontSize: '14px' }}>
+                    ⚠️ USDC Trustline Missing
+                  </div>
+                  <p className="type-caption" style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
+                    Your wallet lacks a trustline for the USDC asset. You must add the trustline to deposit or withdraw tokens.
+                  </p>
+                  <button
+                    className="btn btn-sm btn-destructive"
+                    onClick={handleCreateTrustline}
+                    disabled={isEstablishingTrustline}
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    {isEstablishingTrustline ? 'Establishing Trustline...' : 'Add USDC Trustline'}
+                  </button>
+                </div>
+              )}
 
               {errorMessage && (
                 <div style={{ padding: '12px', backgroundColor: 'var(--color-error-bg)', color: 'var(--color-error)', border: '2px solid var(--color-error)', marginBottom: '20px', fontWeight: 'bold', fontSize: '14px' }}>
@@ -566,10 +666,10 @@ export default function CredShieldPage() {
               </div>
 
               <div className="flex-row-gap" style={{ marginBottom: '32px' }}>
-                <button id="deposit-btn" className="btn btn-md btn-primary" style={{ flex: '1' }} onClick={handleDeposit}>
+                <button id="deposit-btn" className="btn btn-md btn-primary" style={{ flex: '1' }} onClick={handleDeposit} disabled={!hasTrustline}>
                   Deposit
                 </button>
-                <button id="withdraw-btn" className="btn btn-md btn-secondary" style={{ flex: '1' }} onClick={handleWithdraw}>
+                <button id="withdraw-btn" className="btn btn-md btn-secondary" style={{ flex: '1' }} onClick={handleWithdraw} disabled={!hasTrustline}>
                   Withdraw
                 </button>
               </div>
