@@ -116,12 +116,8 @@ test test::test_initialize_and_compliance ... ok
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
 ```
 
-### 3. Demo Video (Walkthrough Animation)
-Here is a live recording of the browser verification flow and vault page dashboard interactions:
 
-![VoiceBox Walkthrough Demo](./docs/screenshots/demo_walkthrough.webp)
-
-### 4. Interactive UI Screenshots
+### 3. Interactive UI Screenshots
 
 #### Desktop Portal View
 ![Desktop Landing Page](./docs/screenshots/desktop_landing.png)
