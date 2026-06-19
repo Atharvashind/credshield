@@ -94,3 +94,41 @@ npm run build
 - **Testnet Contract Address:** `CCKXR3HQSMBQDHRQR7MP2QP4DS6SDGFNAHU47ONNJDJSTAP3BJPSKBU3`
 - **Deploy Transaction Hash:** `d3326c0c0fb3939a056f93672c77578dca7801f2802ce2a2a7c17c389634d8b2`
 - **Verifiable on Stellar Explorer:** [Stellar.Expert View](https://stellar.expert/explorer/testnet/tx/d3326c0c0fb3939a056f93672c77578dca7801f2802ce2a2a7c17c389634d8b2)
+- **Live Demo Link (Vercel):** [https://treasury-vault-six.vercel.app](https://treasury-vault-six.vercel.app)
+
+---
+
+## 🛠️ Submission & Verification Checklist
+
+### 1. CI/CD Status & Build Verification
+[![Continuous Integration](https://github.com/Atharvashind/credshield/actions/workflows/ci.yml/badge.svg)](https://github.com/Atharvashind/credshield/actions)
+
+The GitHub Actions workflow automates Rust smart contract test verification and Next.js production builds.
+
+### 2. Test Output (4 Passing Unit Tests)
+```text
+running 4 tests
+test test::test_compliance_rejected_under_age - should panic ... ok
+test test::test_gated_vault_rejects_non_compliant - should panic ... ok
+test test::test_compliance_rejected_sanctioned - should panic ... ok
+test test::test_initialize_and_compliance ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+```
+
+### 3. Demo Video (Walkthrough Animation)
+Here is a live recording of the browser verification flow and vault page dashboard interactions:
+
+![VoiceBox Walkthrough Demo](./docs/screenshots/demo_walkthrough.webp)
+
+### 4. Interactive UI Screenshots
+
+#### Desktop Portal View
+![Desktop Landing Page](./docs/screenshots/desktop_landing.png)
+
+#### Mobile Responsive UI Layout
+![Mobile Responsive Layout](./docs/screenshots/mobile_landing.png)
+
+#### Yield Vault Dashboard
+![Yield Vault Page](./docs/screenshots/vault_page.png)
+
